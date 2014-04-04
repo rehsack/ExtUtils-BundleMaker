@@ -6,8 +6,9 @@ use warnings FATAL => 'all';
 use Moo;
 use MooX::Options;
 use Module::Runtime qw/use_module module_notional_filename/;
+use File::Path qw//;
 use File::Slurp qw/read_file write_file/;
-use File::Spec;
+use File::Spec qw//;
 
 =head1 NAME
 
@@ -61,6 +62,7 @@ option module => (
                    is       => "ro",
                    doc      => "Specifies name of module to create bundle for",
                    required => 1,
+                     format    => "s",
                  );
 
 option includes => (
@@ -174,6 +176,8 @@ sub make_bundle
     $modname_s =~ s/[^A-Z:]//g;
     $modname_s =~ s/:+/-/g;
     $modname_s =~ tr/A-Z/a-z/;
+
+    -d $target or File::Path::make_path($target);
 
     my $fn = File::Spec->catfile( $target, $modname_s . ".inc" );
     return write_file( $fn, $body );

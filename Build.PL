@@ -11,10 +11,12 @@ my $builder = Module::Build->new(
                                                       'Test::More' => '0.90',
                                                     },
                                   requires => {
-                                                'File::Slurp'     => 0,
+                                                'File::Path'      => 0,
+						'File::Slurp'     => 0,
+						'File::Spec'      => 0,
+                                                'Module::Runtime' => 0,
                                                 'Moo'             => 0,
                                                 'MooX::Options'   => '4.000',
-                                                'Module::Runtime' => 0,
                                               },
                                   add_to_cleanup => ['ExtUtils-BundleMaker-*'],
                                   meta_merge     => {
