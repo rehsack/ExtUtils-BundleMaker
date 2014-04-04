@@ -6,7 +6,8 @@ use warnings FATAL => 'all';
 use Moo;
 use MooX::Options;
 use Module::Runtime qw/use_module module_notional_filename/;
-use File::Slurp qw/read_file/;
+use File::Slurp qw/read_file write_file/;
+use File::Spec;
 
 =head1 NAME
 
@@ -85,7 +86,7 @@ sub _coerce_also
     @also or return [];
     1 == @also and ref $also[0] eq "HASH" and return _coerce_also( \@also );
     1 != @also and die "also => [...]";
-    ref $also[0] ne "ARRAY" or die "also => [...]";
+    ref $also[0] eq "ARRAY" or die "also => [...]";
     @{ $also[0] } = map { ExtUtils::BundleMaker->new( %{$_} ) } @{ $also[0] };
     return $also[0];
 }
@@ -96,13 +97,14 @@ option also => (
                  format    => "s@",
                  autosplit => ",",
                  coerce    => \&_coerce_also,
+		 default   => sub { [] },
                );
 
 has _bundle_body_stub => ( is => "lazy" );
 
-sub _build
+sub _build__bundle_body_stub
 {
-    print <<'EOU';
+    my $_body_stub = <<'EOU';
 sub check_module
 {
     my ($mod, $ver) = @_;
@@ -123,11 +125,12 @@ sub check_module
     }
 }
 EOU
+    return $_body_stub;
 }
 
 has _bundle_body => ( is => "lazy" );
 
-sub _build_bundle_body
+sub _build__bundle_body
 {
     my $self = shift;
 
@@ -136,7 +139,7 @@ sub _build_bundle_body
     eval "use " . $self->module . ";";
     $@ and die $self->module . " is not available: $@";
 
-    my $body = sprintf <<'EOU', $self->module;
+    my $body = sprintf <<'EOU', $self->module, $self->module->VERSION;
 check_module("%s", "%s") or eval <<'END_OF_EXTUTILS_BUNDLE_MAKER_MARKER';
 EOU
 
@@ -160,12 +163,20 @@ sub make_bundle
 {
     my ( $self, $target ) = @_;
 
-    my $body = $self->_bundle_body;
+    my $body = $self->_bundle_body_stub . $self->_bundle_body;
     foreach my $also ( @{ $self->also } )
     {
         $body .= "\n" . $also->_bundle_body;
     }
     $body .= "\n1;\n";
+
+    my $modname_s = $self->module;
+    $modname_s =~ s/[^A-Z:]//g;
+    $modname_s =~ s/:+/-/g;
+    $modname_s =~ tr/A-Z/a-z/;
+
+    my $fn = File::Spec->catfile( $target, $modname_s . ".inc" );
+    return write_file( $fn, $body );
 }
 
 =head1 AUTHOR
