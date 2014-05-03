@@ -4,7 +4,6 @@ use Module::Build;
 
 my $builder = Module::Build->new(
     module_name       => 'ExtUtils::BundleMaker',
-    license           => 'Perl_5',
     dist_author       => q{Jens Rehsack <rehsack@cpan.org>},
     dist_version_from => 'lib/ExtUtils/BundleMaker.pm',
     add_to_cleanup    => ['ExtUtils-BundleMaker-*'],
@@ -15,6 +14,11 @@ my $builder = Module::Build->new(
                 url  => 'git://github.com/rehsack/ExtUtils-BundleMaker.git',
                 web  => 'https://github.com/rehsack/ExtUtils-BundleMaker',
                 type => 'git',
+            },
+            license    => ['http://dev.perl.org/licenses/'],
+            bugtracker => {
+                web    => 'http://rt.cpan.org/NoAuth/ReportBug.html?Queue=ExtUtils-BundleMaker',
+                mailto => 'bug-extutils-bundlemaker@rt.cpan.org',
             },
         },
         prereqs => {
