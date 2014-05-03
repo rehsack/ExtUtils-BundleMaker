@@ -1,6 +1,6 @@
 ---
 install:
-  - cpanm --notest --skip-satisfied App::mymeta_requires
+  - cpanm --notest App::mymeta_requires Module::Build
   - perl Build.PL
   - ./Build manifest
   - perl Build.PL
