@@ -21,7 +21,7 @@ ExtUtils::BundleMaker - Supports making bundles of modules
 
 =cut
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 =head1 SYNOPSIS
 
@@ -91,7 +91,8 @@ option recurse => (
     doc      => "Automatically bundles dependencies for specified Perl version",
     required => 1,
     format   => "s",
-    coerce   => quote_sub(q{ version->new($_[0])->numify }),
+    isa      => quote_sub(q{ exists $Module::CoreList::version{$_[0]} or die "Unsupported Perl version: $_[0]" }),
+    coerce   => quote_sub(q{ my $nv = version->new($_[0])->numify; $nv =~ s/0+$//; $nv; }),
 );
 
 option target => (
@@ -100,6 +101,13 @@ option target => (
     required => 1,
     format   => "s"
 );
+
+has _remaining_deps => (
+    is        => "lazy",
+    init_args => undef
+);
+
+sub _build__remaining_deps { {} }
 
 sub _build_recurse
 {
@@ -168,6 +176,22 @@ has requires => (
     is => "lazy",
 );
 
+my %told;
+
+sub _tell_not_core
+{
+    my ( $m, $v, $cv ) = @_;
+    $told{"$m-$v-$cv"}++ and return;
+    my $ic = Module::CoreList::is_core( $m, $v, $cv );
+    defined $ic or $ic = "n/a";
+    my $di = Module::CoreList::deprecated_in($m);
+    defined $di or $di = "n/a";
+    my $rf = Module::CoreList::removed_from($m);
+    defined $rf or $rf = "n/a";
+    print("$m-$v-$cv: $ic, $di, $rf\n");
+    return;
+}
+
 sub _build_requires
 {
     my $self     = shift;
@@ -175,6 +199,7 @@ sub _build_requires
     my $mcpan    = $self->_meta_cpan;
     my %modules  = %{ $self->modules };
     my @required = sort keys %modules;
+    my %core_req;
     my %satisfied;
     my @loaded;
 
@@ -182,33 +207,47 @@ sub _build_requires
     {
         my $modname = shift @required;
         $modname eq "perl" and next;    # XXX update $core_v if gt and rerun?
-        my $mod  = $mcpan->module($modname);
+        my $mod = $mcpan->module($modname);
+        $mod->distribution eq "perl" and next;
         my $dist = $mcpan->release( $mod->distribution );
+        $dist->provides or warn $mod->distribution . " provides nothing";
+        $dist->provides or p($dist);
         foreach my $dist_mod ( @{ $dist->provides } )
         {
             $satisfied{$dist_mod} and next;
-            my $pmod = $mcpan->module($dist_mod);
             push @loaded, $dist_mod;
-            $satisfied{$_} = 1 for ( map { $_->{name} } @{ $pmod->module } );
+            $satisfied{$dist_mod} = 1;
+            eval {
+                my $pmod = $mcpan->module($dist_mod);
+                $satisfied{$_} = 1 for ( map { $_->{name} } @{ $pmod->module } );
+            };
         }
 
         my %deps = map { $_->{module} => $_->{version} }
-          grep {
-                 ( not Module::CoreList::is_core( $_->{module}, $_->{version}, $core_v ) )
-              or Module::CoreList::deprecated_in( $_->{module} )
-              or Module::CoreList::removed_from( $_->{module} )
-          }
           grep { $_->{phase} eq "runtime" and $_->{relationship} eq "requires" } @{ $dist->dependency };
         foreach my $dep ( keys %deps )
         {
             defined $satisfied{$dep} and next;
-            push @required, $dep;
-            $modules{$dep} = $deps{$dep};
+            # nice use-case for part, but will result in chicken-egg situation
+            if (   ( not Module::CoreList::is_core( $dep, $deps{$dep}, $core_v ) )
+                or Module::CoreList::deprecated_in($dep)
+                or Module::CoreList::removed_from($dep) )
+            {
+                push @required, $dep;
+                $modules{$dep} = $deps{$dep};
+            }
+            else
+            {
+                # _tell_not_core($dep, $deps{$dep}, $core_v);
+                defined( $core_req{$dep} ) and version->new( $core_req{$dep} ) > version->new( $deps{$dep} ) and next;
+                $core_req{$dep} = $deps{$dep};
+            }
         }
     }
 
     # update modules for loader ...
-    %{ $self->modules } = %modules;
+    %{ $self->modules }         = %modules;
+    %{ $self->_remaining_deps } = %core_req;
 
     [ reverse @loaded ];
 }
@@ -238,6 +277,7 @@ sub check_module
 	exit(0);
     }
 }
+
 EOU
     return $_body_stub;
 }
@@ -265,7 +305,6 @@ EOU
         $body .= read_file( $INC{$mnf} );
         $body .= "\nEND_OF_EXTUTILS_BUNDLE_MAKER_MARKER\n\n";
         $body .= sprintf "\$INC{'%s'} = 'Bundled';\n", $mnf;
-        # XXX Hash::Merge requirements from meta ...
         $body .= "\n";
     }
 
