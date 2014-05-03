@@ -3,6 +3,7 @@ install:
   - cpanm --notest --skip-satisfied App::mymeta_requires
   - perl Build.PL
   - ./Build manifest
+  - perl Build.PL
   - mymeta-requires --runtime --build --test --configure --develop --recommends --suggests | cpanm
 language: perl
 perl:
