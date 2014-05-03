@@ -210,8 +210,12 @@ sub _build_requires
         my $mod = $mcpan->module($modname);
         $mod->distribution eq "perl" and next;
         my $dist = $mcpan->release( $mod->distribution );
-        $dist->provides or warn $mod->distribution . " provides nothing";
-        $dist->provides or p($dist);
+        unless($dist->provides)
+	{
+	    warn $mod->distribution . " provides nothing - skip bundling";
+	    $core_req{$modname} = $modules{$modname};
+	    next;
+	}
         foreach my $dist_mod ( @{ $dist->provides } )
         {
             $satisfied{$dist_mod} and next;
@@ -257,25 +261,14 @@ has _bundle_body_stub => ( is => "lazy" );
 sub _build__bundle_body_stub
 {
     my $_body_stub = <<'EOU';
+use IPC::Cmd qw(run QUOTE);
+
 sub check_module
 {
     my ($mod, $ver) = @_;
-    my $rc = fork();
-    if($rc < 0) {
-	die "Need fork(2)";
-    }
-    elsif($rc) {
-	# parent
-	waitpid $rc, 0;
-	printf("Test for %s: %d\n", $mod, $?);
-	return 0 == $?;
-    }
-    else {
-	# child
-	eval "use $mod";
-	$mod->VERSION($ver) or exit(1);
-	exit(0);
-    }
+    my $test_code = QUOTE . "$mod->VERSION($ver)" . QUOTE;
+    ($ok, $err, $full_buf, $stdout_buff, $stderr_buff) = run( command => "$^X -M$mod -e $test_code");
+    return $ok;
 }
 
 EOU
@@ -295,16 +288,17 @@ sub _build__bundle_body
 
     foreach my $mod (@requires)
     {
-        my $mnf  = module_notional_filename( use_module($mod) );
         my $modv = $modules{$mod};
         defined $modv or $modv = 0;
+        my $mnf  = module_notional_filename( $modv ? use_module($mod, $modv) : use_module($mod) );
         $body .= sprintf <<'EOU', $mod, $modv;
-check_module("%s", "%s") or eval <<'END_OF_EXTUTILS_BUNDLE_MAKER_MARKER';
+check_module("%s", "%s") or do { eval <<'END_OF_EXTUTILS_BUNDLE_MAKER_MARKER';
 EOU
 
         $body .= read_file( $INC{$mnf} );
         $body .= "\nEND_OF_EXTUTILS_BUNDLE_MAKER_MARKER\n\n";
-        $body .= sprintf "\$INC{'%s'} = 'Bundled';\n", $mnf;
+	$body .= "    \$@ and die \$@;\n";
+        $body .= sprintf "    defined \$INC{'%s'} or \$INC{'%s'} = 'Bundled';\n};\n", $mnf, $mnf;
         $body .= "\n";
     }
 
