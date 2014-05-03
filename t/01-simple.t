@@ -9,9 +9,9 @@ use Test::Directory;
 use ExtUtils::BundleMaker;
 
 my $dir = Test::Directory->new("t/inc");
-my $bm = ExtUtils::BundleMaker->new( module => "ExtUtils::BundleMaker", includes => [] );
-$bm->make_bundle( "t/inc" );
+my $bm = ExtUtils::BundleMaker->new( modules => ["Test::WriteVariants"], target => "t/inc/t-wv.inc" );
+$bm->make_bundle();
 
-$dir->has("eu-bm.inc");
+$dir->has("t-wv.inc");
 
 done_testing();

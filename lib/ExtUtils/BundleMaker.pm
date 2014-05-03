@@ -2,13 +2,18 @@ package ExtUtils::BundleMaker;
 
 use strict;
 use warnings FATAL => 'all';
+use version;
 
 use Moo;
-use MooX::Options;
-use Module::Runtime qw/use_module module_notional_filename/;
+use MooX::Options with_config_from_file => 1;
+use Module::CoreList ();
+use Module::Runtime qw/require_module use_module module_notional_filename/;
+use File::Basename qw/dirname/;
 use File::Path qw//;
 use File::Slurp qw/read_file write_file/;
 use File::Spec qw//;
+use Params::Util qw/_HASH _ARRAY/;
+use Sub::Quote qw/quote_sub/;
 
 =head1 NAME
 
@@ -27,59 +32,116 @@ Perhaps a little code snippet.
     use ExtUtils::BundleMaker;
 
     my $eu_bm = ExtUtils::BundleMaker->new(
-        module => 'Important::One',
-	# can be omitted when MetaCPAN is availble
-	includes => [ 'Important::One::Util', 'Important::One::Sugar' ]
+        modules => [ 'Important::One', 'Mandatory::Dependency' ],
 	# can be omitted when prerequisites are appropriate
 	also => {
-	    module => 'Significant::Dependency',
+	    modules => [ 'Significant::Dependency' ],
 	},
+	# down to which perl version core modules shall be included?
+	recurse => 'v5.10',
     );
-    # create inc/important_one.inc
-    $eu_bm->make_bundle( output => 'inc' );
+    # create bundle
+    $eu_bm->make_bundle( 'inc/foo_bundle.pl' );
 
 =head1 ATTRIBUTES
 
 Following attributes are supported by ExtUtils::BundleMaker
 
-=head2 module
+=head2 modules
 
-Specifies name of module to create bundle for
-
-=head2 includes
-
-Specifies list of modules to be included in bundle
+Specifies name of module(s) to create bundle for
 
 =head2 also
 
 Specifies list of more bundles to include (recursively)
 
+=head2 target
+
+Specifies target for bundle
+
 =head1 METHODS
 
 =cut
 
-option module => (
-                   is       => "ro",
-                   doc      => "Specifies name of module to create bundle for",
-                   required => 1,
-                     format    => "s",
-                 );
+sub _coerce_modules
+{
+    my $modules = shift;
+    _HASH($modules)  and return $modules;
+    _ARRAY($modules) and return {
+        map {
+            my ( $m, $v ) = split( /=/, $_, 2 );
+            defined $v or $v = 0;
+            ( $m => $v )
+        } @$modules
+    };
+    die "Inappropriate format: $modules";
+}
 
-option includes => (
-                     is        => "lazy",
-                     doc       => "Specifies list of modules to be included in bundle",
-                     format    => "s@",
-                     autosplit => ",",
-                   );
+option modules => (
+    is        => "ro",
+    doc       => "Specifies name of module(s) to create bundle for",
+    required  => 1,
+    format    => "s@",
+    autosplit => ",",
+    coerce    => \&_coerce_modules,
+);
 
-sub _build_includes
+option recurse => (
+    is       => "lazy",
+    doc      => "Automatically bundles dependencies for specified Perl version",
+    required => 1,
+    format   => "s",
+    coerce   => quote_sub(q{ version->new($_[0])->numify }),
+);
+
+option target => (
+    is       => "ro",
+    doc      => "Specifies target for bundle",
+    required => 1,
+    format   => "s"
+);
+
+sub _build_recurse
+{
+    $];
+}
+
+has chi_init => ( is => "lazy" );
+
+sub _build_chi_init
+{
+    my %chi_args = (
+        driver   => 'File',
+        root_dir => '/tmp/metacpan-cache',
+    );
+    return \%chi_args;
+}
+
+has _meta_cpan => (
+    is       => "lazy",
+    init_arg => undef,
+);
+
+sub _build__meta_cpan
 {
     my $self = shift;
-    defined $INC{"MetaCPAN/API.pm"} or require 'MetaCPAN/API.pm';
-    my $mcpan = MetaCPAN::API->new();
-    my $mod = $mcpan->module($self->module);
-    my $dist = $mcpan->release( distribution => $mod->{distribution} );
-    return [ @{$dist->{provides}} ];
+    require_module("MetaCPAN::Client");
+    my %ua;
+    eval {
+        require_module("CHI");
+        require_module("WWW::Mechanize::Cached");
+        require_module("HTTP::Tiny::Mech");
+        my $cia = $self->chi_init();
+        %ua = (
+            ua => HTTP::Tiny::Mech->new(
+                mechua => WWW::Mechanize::Cached->new(
+                    cache => CHI->new(%$cia),
+                ),
+            )
+        );
+    };
+    my $mcpan = MetaCPAN::Client->new(%ua);
+    return $mcpan;
 }
 
 sub _coerce_also
@@ -94,13 +156,62 @@ sub _coerce_also
 }
 
 option also => (
-                 is        => "ro",
-                 doc       => "Specifies list of more bundles to include (recursively)",
-                 format    => "s@",
-                 autosplit => ",",
-                 coerce    => \&_coerce_also,
-		 default   => sub { [] },
-               );
+    is        => "ro",
+    doc       => "Specifies list of more bundles to include (recursively)",
+    format    => "s@",
+    autosplit => ",",
+    coerce    => \&_coerce_also,
+    default   => sub { [] },
+);
+
+has requires => (
+    is => "lazy",
+);
+
+sub _build_requires
+{
+    my $self     = shift;
+    my $core_v   = $self->recurse;
+    my $mcpan    = $self->_meta_cpan;
+    my %modules  = %{ $self->modules };
+    my @required = sort keys %modules;
+    my %satisfied;
+    my @loaded;
+
+    while (@required)
+    {
+        my $modname = shift @required;
+        $modname eq "perl" and next;    # XXX update $core_v if gt and rerun?
+        my $mod  = $mcpan->module($modname);
+        my $dist = $mcpan->release( $mod->distribution );
+        foreach my $dist_mod ( @{ $dist->provides } )
+        {
+            $satisfied{$dist_mod} and next;
+            my $pmod = $mcpan->module($dist_mod);
+            push @loaded, $dist_mod;
+            $satisfied{$_} = 1 for ( map { $_->{name} } @{ $pmod->module } );
+        }
+
+        my %deps = map { $_->{module} => $_->{version} }
+          grep {
+                 ( not Module::CoreList::is_core( $_->{module}, $_->{version}, $core_v ) )
+              or Module::CoreList::deprecated_in( $_->{module} )
+              or Module::CoreList::removed_from( $_->{module} )
+          }
+          grep { $_->{phase} eq "runtime" and $_->{relationship} eq "requires" } @{ $dist->dependency };
+        foreach my $dep ( keys %deps )
+        {
+            defined $satisfied{$dep} and next;
+            push @required, $dep;
+            $modules{$dep} = $deps{$dep};
+        }
+    }
+
+    # update modules for loader ...
+    %{ $self->modules } = %modules;
+
+    [ reverse @loaded ];
+}
 
 has _bundle_body_stub => ( is => "lazy" );
 
@@ -117,6 +228,7 @@ sub check_module
     elsif($rc) {
 	# parent
 	waitpid $rc, 0;
+	printf("Test for %s: %d\n", $mod, $?);
 	return 0 == $?;
     }
     else {
@@ -136,23 +248,26 @@ sub _build__bundle_body
 {
     my $self = shift;
 
-    my @modules = ($self->module, @{$self->includes});
+    my @requires = @{ $self->requires };
+    # keep order; requires builder might update modules
+    my %modules = %{ $self->modules };
+    my $body    = "";
 
-    eval "use " . $self->module . ";";
-    $@ and die $self->module . " is not available: $@";
-
-    my $body = sprintf <<'EOU', $self->module, $self->module->VERSION;
+    foreach my $mod (@requires)
+    {
+        my $mnf  = module_notional_filename( use_module($mod) );
+        my $modv = $modules{$mod};
+        defined $modv or $modv = 0;
+        $body .= sprintf <<'EOU', $mod, $modv;
 check_module("%s", "%s") or eval <<'END_OF_EXTUTILS_BUNDLE_MAKER_MARKER';
 EOU
 
-    foreach my $mod (@modules)
-    {
-	my $mnf = module_notional_filename(use_module( $self->module ));
-	$body .= read_file($INC{$mnf});
-	$body .= "\n";
+        $body .= read_file( $INC{$mnf} );
+        $body .= "\nEND_OF_EXTUTILS_BUNDLE_MAKER_MARKER\n\n";
+        $body .= sprintf "\$INC{'%s'} = 'Bundled';\n", $mnf;
+        # XXX Hash::Merge requirements from meta ...
+        $body .= "\n";
     }
-
-    $body .= "\nEND_OF_EXTUTILS_BUNDLE_MAKER_MARKER\n";
 
     return $body;
 }
@@ -163,7 +278,8 @@ EOU
 
 sub make_bundle
 {
-    my ( $self, $target ) = @_;
+    my $self   = shift;
+    my $target = $self->target;
 
     my $body = $self->_bundle_body_stub . $self->_bundle_body;
     foreach my $also ( @{ $self->also } )
@@ -172,15 +288,10 @@ sub make_bundle
     }
     $body .= "\n1;\n";
 
-    my $modname_s = $self->module;
-    $modname_s =~ s/[^A-Z:]//g;
-    $modname_s =~ s/:+/-/g;
-    $modname_s =~ tr/A-Z/a-z/;
+    my $target_dir = dirname($target);
+    -d $target_dir or File::Path::make_path($target_dir);
 
-    -d $target or File::Path::make_path($target);
-
-    my $fn = File::Spec->catfile( $target, $modname_s . ".inc" );
-    return write_file( $fn, $body );
+    return write_file( $target, $body );
 }
 
 =head1 AUTHOR

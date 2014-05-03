@@ -7,4 +7,4 @@ use ExtUtils::BundleMaker;
 
 my $eu_bm = ExtUtils::BundleMaker->new_with_options;
 
-$eu_bm->make_bundle("inc");
+$eu_bm->make_bundle();
