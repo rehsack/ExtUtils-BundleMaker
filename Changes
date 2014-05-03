@@ -1,5 +1,8 @@
 Revision history for ExtUtils-BundleMaker
 
+0.002	2014-05-03
+    - fix some minor issues with 1st public customer (List::MoreUtils)
+
 0.001	2014-05-03
-        First version, released on an unsuspecting world.
+    - First version, released on an unsuspecting world.
 
