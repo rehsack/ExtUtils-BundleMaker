@@ -1,5 +1,11 @@
 Revision history for ExtUtils-BundleMaker
 
+0.003	2014-05-04
+    - fix some check_module issues
+    - "use" instead of "require" for optional modules
+    - don't mention caching modules as requirement
+    - improve pod
+
 0.002	2014-05-03
     - fix some minor issues with 1st public customer (List::MoreUtils)
 
