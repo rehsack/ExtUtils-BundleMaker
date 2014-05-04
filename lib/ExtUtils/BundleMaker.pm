@@ -136,15 +136,14 @@ sub _build__meta_cpan
     require_module("MetaCPAN::Client");
     my %ua;
     eval {
-        require_module("CHI");
-        require_module("WWW::Mechanize::Cached");
-        require_module("HTTP::Tiny::Mech");
-        my $cia = $self->chi_init();
+        use_module("CHI");
+        use_module("WWW::Mechanize::Cached");
+        use_module("HTTP::Tiny::Mech");
         %ua = (
             ua => HTTP::Tiny::Mech->new(
                 mechua => WWW::Mechanize::Cached->new(
-                    cache => CHI->new(%$cia),
-                ),
+                    cache => CHI->new(%{$self->chi_init}),
+                )
             )
         );
     };
