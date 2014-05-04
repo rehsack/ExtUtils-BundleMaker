@@ -33,15 +33,15 @@ Perhaps a little code snippet.
 
     my $eu_bm = ExtUtils::BundleMaker->new(
         modules => [ 'Important::One', 'Mandatory::Dependency' ],
-	# can be omitted when prerequisites are appropriate
-	also => {
-	    modules => [ 'Significant::Dependency' ],
-	},
 	# down to which perl version core modules shall be included?
 	recurse => 'v5.10',
     );
     # create bundle
     $eu_bm->make_bundle( 'inc/foo_bundle.pl' );
+
+=head1 DESCRIPTION
+
+
 
 =head1 ATTRIBUTES
 
@@ -50,10 +50,6 @@ Following attributes are supported by ExtUtils::BundleMaker
 =head2 modules
 
 Specifies name of module(s) to create bundle for
-
-=head2 also
-
-Specifies list of more bundles to include (recursively)
 
 =head2 target
 
@@ -142,7 +138,7 @@ sub _build__meta_cpan
         %ua = (
             ua => HTTP::Tiny::Mech->new(
                 mechua => WWW::Mechanize::Cached->new(
-                    cache => CHI->new(%{$self->chi_init}),
+                    cache => CHI->new( %{ $self->chi_init } ),
                 )
             )
         );
@@ -150,26 +146,6 @@ sub _build__meta_cpan
     my $mcpan = MetaCPAN::Client->new(%ua);
     return $mcpan;
 }
-
-sub _coerce_also
-{
-    my @also = @_;
-    @also or return [];
-    1 == @also and ref $also[0] eq "HASH" and return _coerce_also( \@also );
-    1 != @also and die "also => [...]";
-    ref $also[0] eq "ARRAY" or die "also => [...]";
-    @{ $also[0] } = map { ExtUtils::BundleMaker->new( %{$_} ) } @{ $also[0] };
-    return $also[0];
-}
-
-option also => (
-    is        => "ro",
-    doc       => "Specifies list of more bundles to include (recursively)",
-    format    => "s@",
-    autosplit => ",",
-    coerce    => \&_coerce_also,
-    default   => sub { [] },
-);
 
 has requires => (
     is => "lazy",
@@ -209,12 +185,12 @@ sub _build_requires
         my $mod = $mcpan->module($modname);
         $mod->distribution eq "perl" and next;
         my $dist = $mcpan->release( $mod->distribution );
-        unless($dist->provides)
-	{
-	    warn $mod->distribution . " provides nothing - skip bundling";
-	    $core_req{$modname} = $modules{$modname};
-	    next;
-	}
+        unless ( $dist->provides )
+        {
+            warn $mod->distribution . " provides nothing - skip bundling";
+            $core_req{$modname} = $modules{$modname};
+            next;
+        }
         foreach my $dist_mod ( @{ $dist->provides } )
         {
             $satisfied{$dist_mod} and next;
@@ -289,14 +265,14 @@ sub _build__bundle_body
     {
         my $modv = $modules{$mod};
         defined $modv or $modv = 0;
-        my $mnf  = module_notional_filename( $modv ? use_module($mod, $modv) : use_module($mod) );
+        my $mnf = module_notional_filename( $modv ? use_module( $mod, $modv ) : use_module($mod) );
         $body .= sprintf <<'EOU', $mod, $modv;
 check_module("%s", "%s") or do { eval <<'END_OF_EXTUTILS_BUNDLE_MAKER_MARKER';
 EOU
 
         $body .= read_file( $INC{$mnf} );
         $body .= "\nEND_OF_EXTUTILS_BUNDLE_MAKER_MARKER\n\n";
-	$body .= "    \$@ and die \$@;\n";
+        $body .= "    \$@ and die \$@;\n";
         $body .= sprintf "    defined \$INC{'%s'} or \$INC{'%s'} = 'Bundled';\n};\n", $mnf, $mnf;
         $body .= "\n";
     }
@@ -313,11 +289,8 @@ sub make_bundle
     my $self   = shift;
     my $target = $self->target;
 
-    my $body = $self->_bundle_body_stub . $self->_bundle_body;
-    foreach my $also ( @{ $self->also } )
-    {
-        $body .= "\n" . $also->_bundle_body;
-    }
+    my $body = $self->_bundle_body_stub;
+    $body .= $self->_bundle_body;
     $body .= "\n1;\n";
 
     my $target_dir = dirname($target);
