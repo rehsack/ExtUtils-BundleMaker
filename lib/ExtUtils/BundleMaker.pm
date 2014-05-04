@@ -17,7 +17,7 @@ use Sub::Quote qw/quote_sub/;
 
 =head1 NAME
 
-ExtUtils::BundleMaker - Supports making bundles of modules
+ExtUtils::BundleMaker - Supports making bundles of modules recursively
 
 =cut
 
@@ -25,23 +25,25 @@ our $VERSION = '0.003';
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
-
     use ExtUtils::BundleMaker;
 
     my $eu_bm = ExtUtils::BundleMaker->new(
         modules => [ 'Important::One', 'Mandatory::Dependency' ],
 	# down to which perl version core modules shall be included?
 	recurse => 'v5.10',
+	target => 'inc/bundle.inc',
     );
     # create bundle
-    $eu_bm->make_bundle( 'inc/foo_bundle.pl' );
+    $eu_bm->make_bundle();
 
 =head1 DESCRIPTION
 
+ExtUtils::BundleMaker is designed to support authors automatically create
+a bundle of important prerequisites which aren't needed outside of the
+distribution but might interfere or overload target.
 
+Because of no dependencies are recorded within a distribution, entire
+distributions of recorded dependencies are bundled.
 
 =head1 ATTRIBUTES
 
@@ -54,6 +56,10 @@ Specifies name of module(s) to create bundle for
 =head2 target
 
 Specifies target for bundle
+
+=head2 recurse
+
+Specify the Perl core version to recurse until.
 
 =head1 METHODS
 
