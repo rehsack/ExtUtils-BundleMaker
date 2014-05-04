@@ -2,6 +2,13 @@ use strict;
 use warnings FATAL => 'all';
 use Module::Build;
 
+# maybe after some patching of MetaCPAN::Client that's reintroduced
+# recommends => {
+#     'CHI'                    => 0,
+#     'HTTP::Tiny::Mech'       => 0,
+#     'WWW::Mechanize::Cached' => 0,
+# },
+
 my $builder = Module::Build->new(
     module_name       => 'ExtUtils::BundleMaker',
     dist_author       => q{Jens Rehsack <rehsack@cpan.org>},
@@ -32,11 +39,6 @@ my $builder = Module::Build->new(
                 },
             },
             runtime => {
-                recommends => {
-                    'CHI'                    => 0,
-                    'HTTP::Tiny::Mech'       => 0,
-                    'WWW::Mechanize::Cached' => 0,
-                },
                 requires => {
                     'File::Basename'       => 0,
                     'File::Path'           => 0,
