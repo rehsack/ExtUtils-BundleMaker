@@ -21,7 +21,7 @@ ExtUtils::BundleMaker - Supports making bundles of modules recursively
 
 =cut
 
-our $VERSION = '0.005';
+our $VERSION = '0.006';
 
 =head1 SYNOPSIS
 
