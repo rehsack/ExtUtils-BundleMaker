@@ -1,9 +1,8 @@
 ---
 install:
-  - cpanm --notest App::mymeta_requires Module::Build
-  - perl Build.PL
-  - ./Build manifest
-  - perl Build.PL
+  - cpanm --notest App::mymeta_requires
+  - perl Makefile.PL
+  - make manifest
   - mymeta-requires --runtime --build --test --configure --develop --recommends --suggests | cpanm
 language: perl
 perl:
