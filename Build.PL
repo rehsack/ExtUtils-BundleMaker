@@ -61,7 +61,8 @@ my $builder = Module::Build->new(
                     'Test::WriteVariants' => '0.005',
                 },
                 suggests => {
-                    'Config::AutoConf' => '0.27',
+                    'Config::AutoConf'   => '0.27',
+                    'ExtUtils::CBuilder' => '0.280216'
                 },
             },
         },

@@ -43,7 +43,8 @@ like( $@, qr/Inappropriate format/, "No scalar for module" );
 
 SKIP:
 {
-    eval { use_module("Config::AutoConf"); } or skip( "More conditions skipped, no Config::AutoConf", 1 );
+    eval { use_module( "Config::AutoConf", "0.27" ); use_module( 'ExtUtils::CBuilder', '0.280216' ); }
+      or skip( "More conditions skipped, no recent Config::AutoConf nor ExtUtils::CBuilder", 1 );
 
     $bm = ExtUtils::BundleMaker->new(
         modules => ["Config::AutoConf"],
