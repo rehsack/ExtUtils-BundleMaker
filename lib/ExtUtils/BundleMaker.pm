@@ -216,17 +216,21 @@ sub _build_requires
         {
             defined $satisfied{$dep} and next;
             # nice use-case for part, but will result in chicken-egg situation
-            if (   ( not Module::CoreList::is_core( $dep, $deps{$dep}, $core_v ) )
-                or Module::CoreList::deprecated_in($dep)
-                or Module::CoreList::removed_from($dep) )
+            if (
+                Module::CoreList::is_core( $dep, $deps{$dep} ? $deps{$dep} : undef, $core_v )
+                and not( Module::CoreList::deprecated_in($dep)
+                    or Module::CoreList::removed_from($dep) )
+              )
             {
-                push @required, $dep;
-                $modules{$dep} = $deps{$dep};
+                defined( $core_req{$dep} )
+                  and version->new( $core_req{$dep} ) > version->new( $deps{$dep} )
+                  and next;
+                $core_req{$dep} = $deps{$dep};
             }
             else
             {
-                defined( $core_req{$dep} ) and version->new( $core_req{$dep} ) > version->new( $deps{$dep} ) and next;
-                $core_req{$dep} = $deps{$dep};
+                push @required, $dep;
+                $modules{$dep} = $deps{$dep};
             }
         }
     }
