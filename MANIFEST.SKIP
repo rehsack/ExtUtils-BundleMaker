@@ -18,6 +18,7 @@ _Inline/.*
 \.tar\.gz$
 ^mess/
 ^tmp/
+^cover_db/
 ^testdata/
 ^blib/
 ^sandbox/
