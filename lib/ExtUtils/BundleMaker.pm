@@ -63,7 +63,8 @@ Specify the Perl core version to recurse until.
 
 =head2 name
 
-Allows to specify a package name for generated bundle
+Allows to specify a package name for generated bundle. Has C<has_> predicate
+for test whether it's set or not.
 
 =head1 METHODS
 
