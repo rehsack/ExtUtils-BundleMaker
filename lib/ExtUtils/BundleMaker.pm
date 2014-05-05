@@ -174,22 +174,6 @@ has requires => (
     is => "lazy",
 );
 
-my %told;
-
-sub _tell_not_core
-{
-    my ( $m, $v, $cv ) = @_;
-    $told{"$m-$v-$cv"}++ and return;
-    my $ic = Module::CoreList::is_core( $m, $v, $cv );
-    defined $ic or $ic = "n/a";
-    my $di = Module::CoreList::deprecated_in($m);
-    defined $di or $di = "n/a";
-    my $rf = Module::CoreList::removed_from($m);
-    defined $rf or $rf = "n/a";
-    print("$m-$v-$cv: $ic, $di, $rf\n");
-    return;
-}
-
 sub _build_requires
 {
     my $self     = shift;
@@ -240,7 +224,6 @@ sub _build_requires
             }
             else
             {
-                # _tell_not_core($dep, $deps{$dep}, $core_v);
                 defined( $core_req{$dep} ) and version->new( $core_req{$dep} ) > version->new( $deps{$dep} ) and next;
                 $core_req{$dep} = $deps{$dep};
             }
