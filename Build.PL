@@ -53,10 +53,15 @@ my $builder = Module::Build->new(
                     'WWW::Mechanize::Cached' => 0,
                 },
             },
-            build => {
+            test => {
                 requires => {
+                    'Module::Runtime'     => 0,
+                    'Test::Directory'     => 0,
                     'Test::More'          => '0.90',
                     'Test::WriteVariants' => '0.005',
+                },
+                suggests => {
+                    'Config::AutoConf' => '0.27',
                 },
             },
         },
