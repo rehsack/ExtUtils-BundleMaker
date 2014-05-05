@@ -4,6 +4,7 @@ use Module::Build;
 
 my $builder = Module::Build->new(
     module_name       => 'ExtUtils::BundleMaker',
+    license           => 'perl',
     dist_author       => q{Jens Rehsack <rehsack@cpan.org>},
     dist_version_from => 'lib/ExtUtils/BundleMaker.pm',
     add_to_cleanup    => ['ExtUtils-BundleMaker-*'],
