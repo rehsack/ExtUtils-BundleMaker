@@ -1,5 +1,13 @@
 Revision history for ExtUtils-BundleMaker
 
+0.004	2014-05-05
+    - mention caching modules as recommended prereqisite together with
+      fixed MetaCPAN::Client 1.003000 (Sawyer X)
+    - generate some additional getters when generating bundle as separate
+      package
+    - improve documentation
+    - add some more tests for better test coverage
+
 0.003	2014-05-04
     - fix some check_module issues
     - "use" instead of "require" for optional modules
