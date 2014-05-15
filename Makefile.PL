@@ -23,7 +23,7 @@ WriteMakefile1(
             },
             license    => ['http://dev.perl.org/licenses/'],
             bugtracker => {
-                web    => 'http://rt.cpan.org/NoAuth/ReportBug.html?Queue=ExtUtils-BundleMaker',
+                web    => 'https://rt.cpan.org/Public/Dist/Display.html?Name=ExtUtils-BundleMaker',
                 mailto => 'bug-extutils-bundlemaker@rt.cpan.org',
             },
         },
